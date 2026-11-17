@@ -3,11 +3,14 @@ importScripts("prayer-utils.js");
 const DEFAULT_PREFERENCES = {
   address: "Bekasi, Indonesia",
   method: 20,
+  shafaq: "general",
+  midnightMode: 0,
   school: 0,
   notificationsEnabled: true,
   reminderMinutes: 0
 };
-const CALCULATION_METHODS = new Set([1, 2, 3, 4, 5, 20]);
+const CALCULATION_METHODS = new Set([0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]);
+const SHAFAQ_OPTIONS = new Set(["general", "ahmer", "abyad"]);
 const CACHE_DAYS = 3;
 const REQUEST_TIMEOUT_MS = 12000;
 const CATCH_UP_WINDOW_MS = 10 * 60 * 1000;
@@ -16,15 +19,19 @@ const RETRY_ALARM_NAME = "prayer-notifier|retry";
 const BASE_RETRY_DELAY_MS = 60 * 1000;
 const MAX_RETRY_DELAY_MS = 6 * 60 * 60 * 1000;
 const NOTIFICATION_ICON = "icon128.png";
+const TOOLBAR_ALARM_NAME = "prayer-notifier|toolbar";
 
 function normalizePreferences(value) {
   const preferences = value || {};
   const method = Number(preferences.method);
+  const midnightMode = Number(preferences.midnightMode);
   const school = Number(preferences.school);
   const reminderMinutes = Number(preferences.reminderMinutes);
   return {
     address: typeof preferences.address === "string" ? preferences.address.trim() : DEFAULT_PREFERENCES.address,
     method: CALCULATION_METHODS.has(method) ? method : DEFAULT_PREFERENCES.method,
+    shafaq: SHAFAQ_OPTIONS.has(preferences.shafaq) ? preferences.shafaq : DEFAULT_PREFERENCES.shafaq,
+    midnightMode: midnightMode === 1 ? 1 : 0,
     school: school === 1 ? 1 : 0,
     notificationsEnabled: preferences.notificationsEnabled !== false,
     reminderMinutes: [0, 5, 10, 15].includes(reminderMinutes) ? reminderMinutes : 0
@@ -37,6 +44,12 @@ function validatePreferences(value) {
   }
   if (!CALCULATION_METHODS.has(Number(value.method))) {
     throw new Error("Metode perhitungan tidak valid");
+  }
+  if (!SHAFAQ_OPTIONS.has(value.shafaq || DEFAULT_PREFERENCES.shafaq)) {
+    throw new Error("Pilihan shafaq tidak valid");
+  }
+  if (![0, 1].includes(value.midnightMode === undefined ? DEFAULT_PREFERENCES.midnightMode : Number(value.midnightMode))) {
+    throw new Error("Mode perhitungan tengah malam tidak valid");
   }
   if (![0, 1].includes(Number(value.school))) {
     throw new Error("Mazhab untuk waktu Asar tidak valid");
@@ -63,6 +76,8 @@ function cacheMatches(cache, preferences) {
   return cache &&
     cache.address === preferences.address &&
     cache.method === preferences.method &&
+    cache.shafaq === preferences.shafaq &&
+    cache.midnightMode === preferences.midnightMode &&
     cache.school === preferences.school &&
     typeof cache.timeZone === "string" &&
     cache.dates;
@@ -72,8 +87,12 @@ async function fetchTimings(address, dateKey, preferences) {
   const params = new URLSearchParams({
     address,
     method: String(preferences.method),
+    midnightMode: String(preferences.midnightMode),
     school: String(preferences.school)
   });
+  if (preferences.method === 15) {
+    params.set("shafaq", preferences.shafaq);
+  }
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -99,6 +118,9 @@ async function fetchTimings(address, dateKey, preferences) {
         throw new Error(`Waktu ${prayer.name} tidak valid`);
       }
     }
+    if (!PrayerUtils.parseTime(timings.Sunrise)) {
+      throw new Error("Waktu terbit tidak valid");
+    }
     return { timings, timeZone };
   } catch (error) {
     if (error.name === "AbortError") {
@@ -116,6 +138,8 @@ function createSchedule(preferences, cache, todayKey, stale, error) {
   return {
     address: preferences.address,
     method: preferences.method,
+    shafaq: preferences.shafaq,
+    midnightMode: preferences.midnightMode,
     school: preferences.school,
     date: todayKey,
     timeZone: cache.timeZone,
@@ -197,6 +221,8 @@ async function loadSchedule(forceRefresh) {
     cache = {
       address: preferences.address,
       method: preferences.method,
+      shafaq: preferences.shafaq,
+      midnightMode: preferences.midnightMode,
       school: preferences.school,
       timeZone: todayResult.timeZone,
       dates,
@@ -358,7 +384,108 @@ async function refreshAndSchedule(forceRefresh) {
   }
   await processDueNotifications(schedule);
   await schedulePrayerAlarms(schedule);
+  await updateAction(schedule);
   return schedule;
+}
+
+function formatBadgeCountdown(remainingMs) {
+  const totalSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const totalMinutes = Math.ceil(totalSeconds / 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  if (hours >= 10) {
+    return `${hours}h`;
+  }
+  return `${hours}:${String(totalMinutes % 60).padStart(2, "0")}`;
+}
+
+function formatFullCountdown(remainingMs) {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+async function updateProgressIcon(percentage) {
+  const canvas = new OffscreenCanvas(32, 32);
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Tidak dapat membuat kanvas ikon ekstensi");
+  }
+
+  context.clearRect(0, 0, 32, 32);
+  context.fillStyle = "#166534";
+  context.beginPath();
+  context.arc(16, 16, 15, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#ffffff";
+  context.beginPath();
+  context.arc(14, 16, 8, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "#166534";
+  context.beginPath();
+  context.arc(18, 13, 8, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#d1d5db";
+  context.fillRect(2, 4, 3, 24);
+  context.fillStyle = "#facc15";
+  const progressHeight = 24 * Math.max(0, Math.min(100, percentage)) / 100;
+  context.fillRect(2, 28 - progressHeight, 3, progressHeight);
+  await chrome.action.setIcon({
+    imageData: context.getImageData(0, 0, 32, 32)
+  });
+}
+
+async function updateAction(schedule) {
+  const progress = PrayerUtils.getPrayerProgress(schedule, new Date());
+  await chrome.action.setBadgeBackgroundColor({ color: "#166534" });
+  if (!progress) {
+    await chrome.action.setBadgeText({ text: "--" });
+    await chrome.action.setTitle({ title: "Jadwal Sholat — jadwal berikutnya belum tersedia" });
+    try {
+      await updateProgressIcon(0);
+    } catch (error) {
+      console.error("Gagal menggambar progress ikon toolbar:", error);
+    }
+    return;
+  }
+
+  const countdown = formatFullCountdown(progress.remainingMs);
+  const stalePrefix = schedule.stale ? "Data jadwal lama. " : "";
+  await chrome.action.setBadgeText({ text: formatBadgeCountdown(progress.remainingMs) });
+  await chrome.action.setTitle({
+    title: `${stalePrefix}${progress.next.name} dalam ${countdown} — progres ${Math.round(progress.percentage)}%`
+  });
+  try {
+    await updateProgressIcon(progress.percentage);
+  } catch (error) {
+    console.error("Gagal menggambar progress ikon toolbar:", error);
+    await chrome.action.setIcon({ path: NOTIFICATION_ICON });
+  }
+}
+
+async function updateActionFromCurrentSchedule() {
+  const schedule = await loadSchedule(false);
+  await processDueNotifications(schedule);
+  await updateAction(schedule);
+}
+
+async function showActionError(error) {
+  await chrome.action.setBadgeBackgroundColor({ color: "#b91c1c" });
+  await chrome.action.setBadgeText({ text: "!" });
+  await chrome.action.setTitle({ title: `Jadwal Sholat — ${error.message}` });
+}
+
+function ensureToolbarAlarm() {
+  chrome.alarms.create(TOOLBAR_ALARM_NAME, { periodInMinutes: 1 });
 }
 
 function respondWith(promise, sendResponse, reportError) {
@@ -366,22 +493,39 @@ function respondWith(promise, sendResponse, reportError) {
     .then(sendResponse)
     .catch(error => {
       console.error(reportError, error);
+      showActionError(error).catch(actionError => console.error("Gagal menampilkan status error toolbar:", actionError));
       sendResponse({ ok: false, error: error.message });
     });
   return true;
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  refreshAndSchedule(false).catch(error => console.error("Gagal menyiapkan jadwal sholat:", error));
+  ensureToolbarAlarm();
+  refreshAndSchedule(false).catch(error => {
+    console.error("Gagal menyiapkan jadwal sholat:", error);
+    showActionError(error).catch(actionError => console.error("Gagal menampilkan status error toolbar:", actionError));
+  });
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  refreshAndSchedule(false).catch(error => console.error("Gagal memulihkan jadwal sholat:", error));
+  ensureToolbarAlarm();
+  refreshAndSchedule(false).catch(error => {
+    console.error("Gagal memulihkan jadwal sholat:", error);
+    showActionError(error).catch(actionError => console.error("Gagal menampilkan status error toolbar:", actionError));
+  });
 });
 
 chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === RETRY_ALARM_NAME || alarm.name.startsWith(PRAYER_ALARM_PREFIX)) {
-    refreshAndSchedule(false).catch(error => console.error("Gagal memeriksa alarm sholat:", error));
+  if (alarm.name === TOOLBAR_ALARM_NAME) {
+    updateActionFromCurrentSchedule().catch(error => {
+      console.error("Gagal memperbarui countdown toolbar:", error);
+      showActionError(error).catch(actionError => console.error("Gagal menampilkan status error toolbar:", actionError));
+    });
+  } else if (alarm.name === RETRY_ALARM_NAME || alarm.name.startsWith(PRAYER_ALARM_PREFIX)) {
+    refreshAndSchedule(false).catch(error => {
+      console.error("Gagal memeriksa alarm sholat:", error);
+      showActionError(error).catch(actionError => console.error("Gagal menampilkan status error toolbar:", actionError));
+    });
   }
 });
 
@@ -412,6 +556,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           return { ok: true, preferences, schedule };
         } catch (error) {
           console.error("Pengaturan tersimpan, tetapi jadwal belum dapat diperbarui:", error);
+          await showActionError(error);
           return { ok: true, preferences, schedule: null, warning: error.message };
         }
       }),

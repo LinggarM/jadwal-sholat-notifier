@@ -1,86 +1,175 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
   <title>Jadwal Sholat</title>
   <style>
-    body { width: 320px; padding: 16px; margin: 0; font-family: sans-serif; color: #222; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
-    .countdown { font-size: 28px; font-weight: bold; text-align: center; font-variant-numeric: tabular-nums; }
-    .battery-container { height: 16px; border: 2px solid #333; border-radius: 4px; padding: 2px; margin: 12px 0; position: relative; }
-    .battery-container::after { content: ''; position: absolute; right: -6px; top: 3px; width: 4px; height: 10px; background: #333; border-radius: 0 2px 2px 0; }
-    .battery-level { height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); width: 0%; transition: width 1s linear; border-radius: 2px; }
-    #nextPrayer { min-height: 18px; text-align: center; margin: 8px 0; }
-    #timeZone, .hint, .privacy { font-size: 11px; color: #666; }
-    #timeZone { text-align: center; margin: 0 0 14px; }
-    fieldset { border: 1px solid #ccc; border-radius: 5px; margin: 12px 0; padding: 10px; }
-    legend { font-weight: bold; padding: 0 4px; }
-    label { display: block; margin-top: 8px; }
-    input[type="text"], select { width: 100%; padding: 7px; margin-top: 4px; box-sizing: border-box; }
-    .checkbox-row { display: flex; align-items: center; gap: 7px; }
-    .checkbox-row input { margin: 0; }
-    .hint { margin-top: 5px; }
-    #prayerTimes { margin: 8px 0; padding: 0; list-style: none; }
-    #prayerTimes li { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
-    .actions { display: flex; gap: 8px; }
-    button { flex: 1; margin-top: 8px; padding: 8px; cursor: pointer; }
+    * { box-sizing: border-box; }
+    body { width: 360px; margin: 0; padding: 12px; background: #edf2ef; color: #17231d; font-family: "Segoe UI", Arial, sans-serif; }
+    button, input, select { font: inherit; }
+    .popup { overflow: hidden; border: 1px solid #dfe8e2; border-radius: 20px; background: #fff; box-shadow: 0 12px 32px rgb(22 52 35 / 12%); }
+    .hero { position: relative; overflow: hidden; padding: 20px 20px 18px; background: linear-gradient(145deg, #123f2a, #17633f 65%, #228252); color: #fff; }
+    .hero::after { position: absolute; top: -64px; right: -44px; width: 190px; height: 190px; border: 1px solid rgb(255 255 255 / 12%); border-radius: 50%; content: ""; box-shadow: 0 0 0 22px rgb(255 255 255 / 4%), 0 0 0 46px rgb(255 255 255 / 3%); pointer-events: none; }
+    .brand { display: flex; align-items: center; gap: 7px; color: #c1e3cc; font-size: 10px; font-weight: 700; letter-spacing: 1.4px; }
+    .brand-dot { width: 7px; height: 7px; border-radius: 50%; background: #a7e6bd; box-shadow: 0 0 10px rgb(167 230 189 / 70%); }
+    #locationDisplay { overflow: hidden; margin: 7px 0 2px; font-size: 17px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    #dateDisplay { margin: 0; color: #d0e7d8; font-size: 11px; }
+    .next-block { position: relative; z-index: 1; margin-top: 21px; }
+    .eyebrow { margin: 0 0 4px; color: #c1e3cc; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+    #nextPrayer { margin: 0; font-size: 13px; color: #effaf2; }
+    .countdown { margin-top: 3px; font-size: 38px; font-weight: 650; letter-spacing: 1px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+    .progress-track { height: 7px; margin-top: 14px; overflow: hidden; border-radius: 99px; background: rgb(255 255 255 / 22%); }
+    .progress-level { display: block; width: 0; height: 100%; border-radius: inherit; background: #b8ef85; transition: width .5s ease; }
+    #timeZone { margin: 9px 0 0; color: #d0e7d8; font-size: 10px; }
+    .content { padding: 16px; }
+    .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+    h2 { margin: 0; font-size: 14px; }
+    .section-note { color: #7d8b82; font-size: 10px; }
+    #prayerTimes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 0; padding: 0; list-style: none; }
+    #prayerTimes li { display: flex; min-height: 47px; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid #e8eee9; border-radius: 11px; background: #f8faf8; }
+    #prayerTimes li.is-next { border-color: #9cccaa; background: #edf7f0; box-shadow: inset 3px 0 #25804c; }
+    #prayerTimes li.sunrise { background: #fffaf0; border-color: #f1e7cf; }
+    #prayerTimes li.night-time { background: #f5f6fb; border-color: #e4e6f0; }
+    #prayerTimes li:last-child { grid-column: 1 / -1; }
+    .time-name { color: #66746a; font-size: 11px; }
+    #prayerTimes time { color: #263b2d; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    #prayerTimes li.is-next .time-name { color: #286440; font-weight: 600; }
+    details { margin-top: 14px; border-top: 1px solid #e8eee9; }
+    summary { padding: 13px 2px 3px; color: #286440; cursor: pointer; font-size: 12px; font-weight: 650; list-style-position: inside; }
+    .settings-content { padding: 7px 2px 1px; }
+    label { display: block; margin-top: 10px; color: #39483e; font-size: 11px; font-weight: 600; }
+    input[type="text"], select { width: 100%; margin-top: 5px; padding: 8px 9px; border: 1px solid #d9e3dc; border-radius: 8px; outline: none; background: #fff; color: #203328; font-size: 12px; }
+    input[type="text"]:focus, select:focus { border-color: #4b9b68; box-shadow: 0 0 0 3px rgb(75 155 104 / 14%); }
+    .hint, .privacy { color: #78857c; font-size: 10px; line-height: 1.45; }
+    .hint { margin: 5px 0 0; }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 13px; }
+    .checkbox-row input { accent-color: #247548; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+    button { min-height: 34px; padding: 7px 9px; border: 1px solid #cddbd1; border-radius: 9px; background: #fff; color: #286440; cursor: pointer; font-size: 11px; font-weight: 650; }
+    #saveBtn { border-color: #1c6b3f; background: #1c6b3f; color: #fff; }
+    button:hover:not(:disabled) { filter: brightness(.96); }
     button:disabled { cursor: wait; opacity: .6; }
-    #status { min-height: 16px; margin: 8px 0 0; font-size: 11px; color: #555; }
-    .privacy { line-height: 1.4; margin: 10px 0 0; }
+    .privacy { margin: 12px 0 0; }
+    .privacy a { color: #286440; }
+    #status { min-height: 14px; margin: 10px 0 0; color: #657369; font-size: 10px; line-height: 1.4; }
   </style>
 </head>
 <body>
-  <h1>Jadwal Sholat</h1>
-  <div class="countdown" id="countdown" aria-live="off">--:--:--</div>
-  <div class="battery-container" role="progressbar" aria-label="Progres menuju waktu sholat berikutnya" aria-valuemin="0" aria-valuemax="100">
-    <div class="battery-level" id="batteryBar"></div>
-  </div>
-  <p id="nextPrayer" aria-live="polite">Memuat jadwal...</p>
-  <p id="timeZone">Memuat zona waktu...</p>
-  <ul id="prayerTimes" aria-label="Jadwal sholat hari ini"></ul>
+  <main class="popup">
+    <header class="hero">
+      <div class="brand"><span class="brand-dot"></span> JADWAL SHOLAT</div>
+      <h1 id="locationDisplay">Bekasi, Indonesia</h1>
+      <p id="dateDisplay">Memuat tanggal...</p>
+      <div class="next-block">
+        <p class="eyebrow">Sholat berikutnya</p>
+        <p id="nextPrayer" aria-live="polite">Memuat jadwal...</p>
+        <div class="countdown" id="countdown" aria-live="off">--:--:--</div>
+        <div class="progress-track" role="progressbar" aria-label="Progres menuju waktu sholat berikutnya" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span class="progress-level" id="progressBar"></span>
+        </div>
+        <p id="timeZone">Memuat zona waktu...</p>
+      </div>
+    </header>
 
-  <fieldset>
-    <legend>Lokasi dan jadwal</legend>
-    <label for="addressInput">Lokasi</label>
-    <input type="text" id="addressInput" placeholder="Pondok Gede, Bekasi, Indonesia" autocomplete="street-address" maxlength="200">
-    <div class="hint">Contoh: Pondok Gede, Bekasi, Indonesia</div>
-    <label for="methodInput">Metode perhitungan</label>
-    <select id="methodInput">
-      <option value="20">Kementerian Agama RI</option>
-      <option value="3">Muslim World League</option>
-      <option value="2">ISNA</option>
-      <option value="4">Umm al-Qura</option>
-      <option value="1">University of Islamic Sciences, Karachi</option>
-      <option value="5">Egyptian General Authority</option>
-    </select>
-    <label for="schoolInput">Mazhab untuk waktu Asar</label>
-    <select id="schoolInput">
-      <option value="0">Syafi'i, Maliki, Hanbali</option>
-      <option value="1">Hanafi</option>
-    </select>
-    <label class="checkbox-row" for="notificationsInput">
-      <input type="checkbox" id="notificationsInput">
-      Aktifkan notifikasi waktu sholat
-    </label>
-    <label for="reminderInput">Pengingat sebelum waktu sholat</label>
-    <select id="reminderInput">
-      <option value="0">Tanpa pengingat tambahan</option>
-      <option value="5">5 menit</option>
-      <option value="10">10 menit</option>
-      <option value="15">15 menit</option>
-    </select>
-    <div class="actions">
-      <button id="saveBtn" type="button">Simpan pengaturan</button>
-      <button id="refreshBtn" type="button">Perbarui jadwal</button>
-    </div>
-  </fieldset>
-  <p class="privacy">
-    Alamat lokasi dikirim melalui HTTPS ke
-    <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer">Aladhan</a>
-    untuk mengambil jadwal. Pengaturan disimpan di perangkat ini.
-  </p>
-  <p id="status" role="status" aria-live="polite"></p>
+    <section class="content" aria-labelledby="scheduleHeading">
+      <div class="section-heading">
+        <h2 id="scheduleHeading">Jadwal hari ini</h2>
+        <span class="section-note">Waktu setempat</span>
+      </div>
+      <ul id="prayerTimes" aria-label="Jadwal sholat, waktu terbit, dan waktu malam"></ul>
+
+      <details>
+        <summary>Pengaturan lokasi dan notifikasi</summary>
+        <div class="settings-content">
+          <label for="addressInput">Lokasi</label>
+          <input type="text" id="addressInput" placeholder="Pondok Gede, Bekasi, Indonesia" autocomplete="street-address" maxlength="200">
+          <p class="hint">Contoh: Pondok Gede, Bekasi, Indonesia</p>
+
+          <label for="methodInput">Metode perhitungan</label>
+          <select id="methodInput">
+            <optgroup label="Metode umum">
+              <option value="0">Jafari / Syiah Itsna Asyari</option>
+              <option value="1">University of Islamic Sciences, Karachi</option>
+              <option value="2">Islamic Society of North America (ISNA)</option>
+              <option value="3">Muslim World League (MWL)</option>
+              <option value="4">Umm Al-Qura University, Makkah</option>
+              <option value="5">Egyptian General Authority of Survey</option>
+            </optgroup>
+            <optgroup label="Regional">
+              <option value="7">Institute of Geophysics, University of Tehran</option>
+              <option value="8">Gulf Region</option>
+              <option value="9">Kuwait</option>
+              <option value="10">Qatar</option>
+              <option value="11">Majlis Ugama Islam Singapura (MUIS)</option>
+              <option value="12">Union Organization Islamique de France</option>
+              <option value="13">Diyanet İşleri Başkanlığı, Turki</option>
+              <option value="14">Spiritual Administration of Muslims of Russia</option>
+              <option value="17">JAKIM Malaysia</option>
+              <option value="18">Tunisia</option>
+              <option value="19">Algeria</option>
+              <option value="20">KEMENAG, Kementerian Agama RI</option>
+              <option value="21">Maroko</option>
+              <option value="22">Comunidade Islâmica de Lisboa</option>
+              <option value="23">Ministry of Awqaf, Islamic Affairs and Holy Places (Jordan)</option>
+            </optgroup>
+            <optgroup label="Metode khusus">
+              <option value="15">Moonsighting Committee Worldwide</option>
+              <option value="16">Dubai (eksperimental)</option>
+            </optgroup>
+          </select>
+
+          <div id="shafaqSetting" hidden>
+            <label for="shafaqInput">Shafaq (metode Moonsighting)</label>
+            <select id="shafaqInput">
+              <option value="general">General</option>
+              <option value="ahmer">Ahmer (senja merah)</option>
+              <option value="abyad">Abyad (senja putih)</option>
+            </select>
+            <p class="hint">Parameter ini diperlukan untuk metode Moonsighting Committee.</p>
+          </div>
+
+          <label for="midnightModeInput">Metode perhitungan tengah malam</label>
+          <select id="midnightModeInput">
+            <option value="0">Standard (titik tengah Magrib–Terbit)</option>
+            <option value="1">Jafari (titik tengah Magrib–Subuh)</option>
+          </select>
+          <p class="hint">Mengatur nilai waktu “Tengah malam” pada jadwal.</p>
+
+          <label for="schoolInput">Mazhab untuk waktu Asar</label>
+          <select id="schoolInput">
+            <option value="0">Syafi'i, Maliki, Hanbali</option>
+            <option value="1">Hanafi</option>
+          </select>
+
+          <label class="checkbox-row" for="notificationsInput">
+            <input type="checkbox" id="notificationsInput">
+            Aktifkan notifikasi waktu sholat
+          </label>
+
+          <label for="reminderInput">Pengingat sebelum waktu sholat</label>
+          <select id="reminderInput">
+            <option value="0">Tanpa pengingat tambahan</option>
+            <option value="5">5 menit</option>
+            <option value="10">10 menit</option>
+            <option value="15">15 menit</option>
+          </select>
+
+          <div class="actions">
+            <button id="saveBtn" type="button">Simpan pengaturan</button>
+            <button id="refreshBtn" type="button">Perbarui jadwal</button>
+          </div>
+          <p class="privacy">
+            Alamat dikirim melalui HTTPS ke
+            <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer">Aladhan</a>.
+            Pengaturan disimpan di perangkat ini.
+          </p>
+        </div>
+      </details>
+      <p id="status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
 
   <script src="prayer-utils.js"></script>
   <script src="popup.js"></script>

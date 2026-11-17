@@ -1,6 +1,8 @@
 const DEFAULT_PREFERENCES = {
   address: "Bekasi, Indonesia",
   method: 20,
+  shafaq: "general",
+  midnightMode: 0,
   school: 0,
   notificationsEnabled: true,
   reminderMinutes: 0
@@ -8,10 +10,13 @@ const DEFAULT_PREFERENCES = {
 
 const countdownElement = document.getElementById("countdown");
 const nextPrayerElement = document.getElementById("nextPrayer");
-const batteryBar = document.getElementById("batteryBar");
-const batteryContainer = document.querySelector(".battery-container");
+const progressBar = document.getElementById("progressBar");
+const progressTrack = document.querySelector(".progress-track");
 const addressInput = document.getElementById("addressInput");
 const methodInput = document.getElementById("methodInput");
+const shafaqSetting = document.getElementById("shafaqSetting");
+const shafaqInput = document.getElementById("shafaqInput");
+const midnightModeInput = document.getElementById("midnightModeInput");
 const schoolInput = document.getElementById("schoolInput");
 const notificationsInput = document.getElementById("notificationsInput");
 const reminderInput = document.getElementById("reminderInput");
@@ -20,6 +25,8 @@ const refreshButton = document.getElementById("refreshBtn");
 const statusElement = document.getElementById("status");
 const timeZoneElement = document.getElementById("timeZone");
 const prayerTimesElement = document.getElementById("prayerTimes");
+const locationDisplay = document.getElementById("locationDisplay");
+const dateDisplay = document.getElementById("dateDisplay");
 let schedule = null;
 let nextScheduleAttempt = 0;
 
@@ -27,6 +34,8 @@ function getPreferencesFromForm() {
   return {
     address: addressInput.value.trim(),
     method: Number(methodInput.value),
+    shafaq: shafaqInput.value,
+    midnightMode: Number(midnightModeInput.value),
     school: Number(schoolInput.value),
     notificationsEnabled: notificationsInput.checked,
     reminderMinutes: Number(reminderInput.value)
@@ -36,6 +45,11 @@ function getPreferencesFromForm() {
 function applyPreferences(preferences) {
   addressInput.value = preferences.address || DEFAULT_PREFERENCES.address;
   methodInput.value = String(preferences.method);
+  shafaqInput.value = preferences.shafaq || DEFAULT_PREFERENCES.shafaq;
+  shafaqSetting.hidden = preferences.method !== 15;
+  midnightModeInput.value = String(
+    preferences.midnightMode === undefined ? DEFAULT_PREFERENCES.midnightMode : preferences.midnightMode
+  );
   schoolInput.value = String(preferences.school);
   notificationsInput.checked = preferences.notificationsEnabled;
   reminderInput.value = String(preferences.reminderMinutes);
@@ -56,15 +70,26 @@ function sendMessage(message) {
   });
 }
 
-function renderPrayerTimes() {
+function renderPrayerTimes(nextPrayerKey) {
   prayerTimesElement.replaceChildren();
   if (!schedule) {
     return;
   }
-  for (const prayer of PrayerUtils.PRAYERS) {
+  for (const prayer of PrayerUtils.SCHEDULE_TIMES) {
     const item = document.createElement("li");
     const name = document.createElement("span");
     const time = document.createElement("time");
+    const classes = [];
+    if (prayer.key === nextPrayerKey) {
+      classes.push("is-next");
+    }
+    if (prayer.key === "Sunrise") {
+      classes.push("sunrise");
+    } else if (["Imsak", "Midnight", "Lastthird"].includes(prayer.key)) {
+      classes.push("night-time");
+    }
+    item.className = classes.join(" ");
+    name.className = "time-name";
     name.textContent = prayer.name;
     time.textContent = String(schedule.timings[prayer.key] || "--:--").slice(0, 5);
     item.append(name, time);
@@ -78,8 +103,8 @@ function updateCountdown() {
   if (!schedule || schedule.date !== today) {
     countdownElement.textContent = "--:--:--";
     nextPrayerElement.textContent = "Memuat jadwal...";
-    batteryBar.style.width = "0%";
-    batteryContainer.setAttribute("aria-valuenow", "0");
+    progressBar.style.width = "0%";
+    progressTrack.setAttribute("aria-valuenow", "0");
     if (Date.now() >= nextScheduleAttempt) {
       nextScheduleAttempt = Date.now() + 60000;
       loadSchedule(false);
@@ -87,65 +112,41 @@ function updateCountdown() {
     return;
   }
 
-  const yesterday = PrayerUtils.addDays(today, -1);
-  const events = [];
-  const previousIsha = PrayerUtils.toInstant(
-    yesterday,
-    (schedule.previousTimings || schedule.timings).Isha,
-    schedule.timeZone
-  );
-  if (previousIsha) {
-    events.push({ time: previousIsha, name: "Isya" });
-  }
-  for (const prayer of PrayerUtils.PRAYERS) {
-    const time = PrayerUtils.toInstant(today, schedule.timings[prayer.key], schedule.timeZone);
-    if (time) {
-      events.push({ time, name: prayer.name });
-    }
-  }
-  if (schedule.tomorrowTimings) {
-    const time = PrayerUtils.toInstant(
-      schedule.tomorrowDate,
-      schedule.tomorrowTimings.Fajr,
-      schedule.timeZone
-    );
-    if (time) {
-      events.push({ time, name: "Subuh" });
-    }
-  }
-  events.sort((left, right) => left.time - right.time);
-
-  const nextIndex = events.findIndex(event => event.time > now);
-  if (nextIndex < 0) {
+  const progress = PrayerUtils.getPrayerProgress(schedule, now);
+  if (!progress) {
     countdownElement.textContent = "--:--:--";
     nextPrayerElement.textContent = "Jadwal berikutnya belum tersedia";
-    batteryBar.style.width = "0%";
-    batteryContainer.setAttribute("aria-valuenow", "0");
+    progressBar.style.width = "0%";
+    progressTrack.setAttribute("aria-valuenow", "0");
     return;
   }
 
-  const next = events[nextIndex];
-  const previous = events[Math.max(0, nextIndex - 1)];
-  const remaining = next.time - now;
-  const totalInterval = next.time - previous.time;
-  const elapsed = Math.max(0, totalInterval - remaining);
-  const percentage = totalInterval > 0 ? Math.min(100, (elapsed / totalInterval) * 100) : 0;
-  const seconds = Math.floor(remaining / 1000);
+  const seconds = Math.floor(progress.remainingMs / 1000);
   const hours = String(Math.floor(seconds / 3600)).padStart(2, "0");
   const minutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
   const remainder = String(seconds % 60).padStart(2, "0");
 
   countdownElement.textContent = `${hours}:${minutes}:${remainder}`;
-  nextPrayerElement.textContent = `Menuju waktu sholat ${next.name}`;
-  batteryBar.style.width = `${percentage}%`;
-  batteryContainer.setAttribute("aria-valuenow", String(Math.round(percentage)));
+  nextPrayerElement.textContent = `Menuju waktu sholat ${progress.next.name}`;
+  progressBar.style.width = `${progress.percentage}%`;
+  progressTrack.setAttribute("aria-valuenow", String(Math.round(progress.percentage)));
 }
 
 function renderSchedule() {
   if (!schedule) {
     return;
   }
-  renderPrayerTimes();
+  locationDisplay.textContent = schedule.address;
+  dateDisplay.textContent = new Intl.DateTimeFormat("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: schedule.timeZone
+  }).format(new Date());
+  const progress = PrayerUtils.getPrayerProgress(schedule, new Date());
+  const nextPrayerKey = progress && progress.next.date === schedule.date ? progress.next.key : null;
+  renderPrayerTimes(nextPrayerKey);
   timeZoneElement.textContent = `Zona waktu: ${schedule.timeZone} (${schedule.date})`;
   updateCountdown();
   if (schedule.stale) {
@@ -194,6 +195,8 @@ saveButton.addEventListener("click", async () => {
     } else {
       schedule = null;
       renderPrayerTimes();
+      locationDisplay.textContent = response.preferences.address;
+      dateDisplay.textContent = "Jadwal belum tersedia";
       timeZoneElement.textContent = "Zona waktu belum tersedia";
       updateCountdown();
       statusElement.textContent = `Pengaturan tersimpan, tetapi jadwal belum dapat diperbarui: ${response.warning}`;
@@ -214,6 +217,10 @@ refreshButton.addEventListener("click", async () => {
 
 notificationsInput.addEventListener("change", () => {
   reminderInput.disabled = !notificationsInput.checked;
+});
+
+methodInput.addEventListener("change", () => {
+  shafaqSetting.hidden = Number(methodInput.value) !== 15;
 });
 
 applyPreferences(DEFAULT_PREFERENCES);

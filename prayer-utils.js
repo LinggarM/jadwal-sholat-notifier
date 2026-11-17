@@ -6,6 +6,14 @@ var PrayerUtils = (() => {
     { key: "Maghrib", name: "Magrib" },
     { key: "Isha", name: "Isya" }
   ];
+  const SCHEDULE_TIMES = [
+    { key: "Imsak", name: "Imsak" },
+    PRAYERS[0],
+    { key: "Sunrise", name: "Terbit" },
+    ...PRAYERS.slice(1),
+    { key: "Midnight", name: "Tengah malam" },
+    { key: "Lastthird", name: "Sepertiga malam terakhir" }
+  ];
 
   function dateKey(date, timeZone) {
     if (!timeZone) {
@@ -84,5 +92,51 @@ var PrayerUtils = (() => {
     return new Date(instant);
   }
 
-  return { PRAYERS, addDays, apiDate, dateKey, parseTime, toInstant };
+  function getPrayerProgress(schedule, now) {
+    const today = dateKey(now, schedule.timeZone);
+    if (schedule.date !== today) {
+      return null;
+    }
+
+    const yesterday = addDays(today, -1);
+    const events = [];
+    const previousTimings = schedule.previousTimings || schedule.timings;
+    const previousIsha = toInstant(yesterday, previousTimings.Isha, schedule.timeZone);
+    if (previousIsha) {
+      events.push({ time: previousIsha, date: yesterday, key: "Isha", name: "Isya" });
+    }
+
+    for (const prayer of PRAYERS) {
+      const time = toInstant(today, schedule.timings[prayer.key], schedule.timeZone);
+      if (time) {
+        events.push({ time, date: today, key: prayer.key, name: prayer.name });
+      }
+    }
+    if (schedule.tomorrowTimings) {
+      for (const prayer of PRAYERS) {
+        const time = toInstant(schedule.tomorrowDate, schedule.tomorrowTimings[prayer.key], schedule.timeZone);
+        if (time) {
+          events.push({ time, date: schedule.tomorrowDate, key: prayer.key, name: prayer.name });
+        }
+      }
+    }
+    events.sort((left, right) => left.time - right.time);
+
+    const nextIndex = events.findIndex(event => event.time > now);
+    if (nextIndex < 1) {
+      return null;
+    }
+    const next = events[nextIndex];
+    const previous = events[nextIndex - 1];
+    const remainingMs = next.time - now;
+    const intervalMs = next.time - previous.time;
+    const elapsedMs = Math.max(0, intervalMs - remainingMs);
+    return {
+      next,
+      remainingMs,
+      percentage: intervalMs > 0 ? Math.min(100, (elapsedMs / intervalMs) * 100) : 0
+    };
+  }
+
+  return { PRAYERS, SCHEDULE_TIMES, addDays, apiDate, dateKey, getPrayerProgress, parseTime, toInstant };
 })();

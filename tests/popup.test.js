@@ -35,6 +35,7 @@ class FakeElement {
 
 test("renders countdown and prayer list in the location timezone", async () => {
   const elements = new Map();
+  const sentMessages = [];
   const getElement = id => {
     if (!elements.has(id)) {
       elements.set(id, new FakeElement());
@@ -56,17 +57,23 @@ test("renders countdown and prayer list in the location timezone", async () => {
     timeZone: "Asia/Jakarta",
     address: "Jakarta, Indonesia",
     timings: {
+      Imsak: "04:10",
       Fajr: "04:30",
+      Sunrise: "05:45",
       Dhuhr: "12:00",
       Asr: "15:00",
       Maghrib: "18:00",
-      Isha: "20:00"
+      Isha: "20:00",
+      Midnight: "00:00",
+      Lastthird: "02:00"
     },
     previousTimings: { Isha: "20:00" },
     tomorrowTimings: { Fajr: "04:29" },
     preferences: {
       address: "Jakarta, Indonesia",
       method: 20,
+      shafaq: "general",
+      midnightMode: 0,
       school: 0,
       notificationsEnabled: true,
       reminderMinutes: 0
@@ -77,8 +84,9 @@ test("renders countdown and prayer list in the location timezone", async () => {
     chrome: {
       runtime: {
         lastError: undefined,
-        sendMessage(_message, callback) {
-          callback({ ok: true, schedule });
+        sendMessage(message, callback) {
+          sentMessages.push(message);
+          callback({ ok: true, schedule, preferences: schedule.preferences });
         }
       }
     },
@@ -103,6 +111,23 @@ test("renders countdown and prayer list in the location timezone", async () => {
 
   assert.equal(getElement("countdown").textContent, "05:30:00");
   assert.equal(getElement("nextPrayer").textContent, "Menuju waktu sholat Zuhur");
-  assert.equal(getElement("prayerTimes").children.length, 5);
+  assert.equal(getElement("prayerTimes").children.length, 9);
+  assert.equal(getElement("prayerTimes").children[2].children[0].textContent, "Terbit");
+  assert.equal(getElement("prayerTimes").children[2].className, "sunrise");
+  assert.equal(getElement("prayerTimes").children[0].children[0].textContent, "Imsak");
+  assert.equal(getElement("prayerTimes").children[7].children[0].textContent, "Tengah malam");
+  assert.equal(getElement("prayerTimes").children[8].children[0].textContent, "Sepertiga malam terakhir");
   assert.match(getElement("timeZone").textContent, /Asia\/Jakarta/);
+  assert.equal(getElement("shafaqSetting").hidden, true);
+  assert.equal(getElement("midnightModeInput").value, "0");
+
+  getElement("methodInput").value = "15";
+  getElement("methodInput").listeners.change();
+  assert.equal(getElement("shafaqSetting").hidden, false);
+
+  getElement("midnightModeInput").value = "1";
+  getElement("saveBtn").listeners.click();
+  await new Promise(resolve => setImmediate(resolve));
+  const saveRequest = sentMessages.find(message => message.type === "savePreferences");
+  assert.equal(saveRequest.preferences.midnightMode, 1);
 });
