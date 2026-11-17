@@ -5,35 +5,84 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jadwal Sholat</title>
   <style>
-    body { width: 280px; padding: 16px; margin: 0; font-family: sans-serif; color: #222; }
+    body { width: 320px; padding: 16px; margin: 0; font-family: sans-serif; color: #222; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
     .countdown { font-size: 28px; font-weight: bold; text-align: center; font-variant-numeric: tabular-nums; }
     .battery-container { height: 16px; border: 2px solid #333; border-radius: 4px; padding: 2px; margin: 12px 0; position: relative; }
     .battery-container::after { content: ''; position: absolute; right: -6px; top: 3px; width: 4px; height: 10px; background: #333; border-radius: 0 2px 2px 0; }
     .battery-level { height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); width: 0%; transition: width 1s linear; border-radius: 2px; }
-    #nextPrayer { min-height: 18px; text-align: center; margin: 8px 0 16px; }
-    label { display: block; }
-    input { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
-    .hint { font-size: 11px; color: #666; margin-top: 5px; font-style: italic; }
-    button { width: 100%; margin-top: 10px; padding: 8px; cursor: pointer; }
+    #nextPrayer { min-height: 18px; text-align: center; margin: 8px 0; }
+    #timeZone, .hint, .privacy { font-size: 11px; color: #666; }
+    #timeZone { text-align: center; margin: 0 0 14px; }
+    fieldset { border: 1px solid #ccc; border-radius: 5px; margin: 12px 0; padding: 10px; }
+    legend { font-weight: bold; padding: 0 4px; }
+    label { display: block; margin-top: 8px; }
+    input[type="text"], select { width: 100%; padding: 7px; margin-top: 4px; box-sizing: border-box; }
+    .checkbox-row { display: flex; align-items: center; gap: 7px; }
+    .checkbox-row input { margin: 0; }
+    .hint { margin-top: 5px; }
+    #prayerTimes { margin: 8px 0; padding: 0; list-style: none; }
+    #prayerTimes li { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+    .actions { display: flex; gap: 8px; }
+    button { flex: 1; margin-top: 8px; padding: 8px; cursor: pointer; }
+    button:disabled { cursor: wait; opacity: .6; }
     #status { min-height: 16px; margin: 8px 0 0; font-size: 11px; color: #555; }
+    .privacy { line-height: 1.4; margin: 10px 0 0; }
   </style>
 </head>
 <body>
+  <h1>Jadwal Sholat</h1>
   <div class="countdown" id="countdown" aria-live="off">--:--:--</div>
-  <div class="battery-container">
+  <div class="battery-container" role="progressbar" aria-label="Progres menuju waktu sholat berikutnya" aria-valuemin="0" aria-valuemax="100">
     <div class="battery-level" id="batteryBar"></div>
   </div>
   <p id="nextPrayer" aria-live="polite">Memuat jadwal...</p>
+  <p id="timeZone">Memuat zona waktu...</p>
+  <ul id="prayerTimes" aria-label="Jadwal sholat hari ini"></ul>
 
-  <label for="addressInput"><strong>Lokasi:</strong></label>
-  <input type="text" id="addressInput" placeholder="Pondok Gede, Bekasi, Indonesia" autocomplete="street-address">
-  <div class="hint">
-    Format dari lokasi terkecil ke terbesar.<br>
-    Contoh: "Kec. Pondok Gede, Jawa Barat" atau "Jl. Raya Jatiwaringin, Pondok Gede, Indonesia"
-  </div>
-  <button id="saveBtn" type="button">Simpan</button>
+  <fieldset>
+    <legend>Lokasi dan jadwal</legend>
+    <label for="addressInput">Lokasi</label>
+    <input type="text" id="addressInput" placeholder="Pondok Gede, Bekasi, Indonesia" autocomplete="street-address" maxlength="200">
+    <div class="hint">Contoh: Pondok Gede, Bekasi, Indonesia</div>
+    <label for="methodInput">Metode perhitungan</label>
+    <select id="methodInput">
+      <option value="20">Kementerian Agama RI</option>
+      <option value="3">Muslim World League</option>
+      <option value="2">ISNA</option>
+      <option value="4">Umm al-Qura</option>
+      <option value="1">University of Islamic Sciences, Karachi</option>
+      <option value="5">Egyptian General Authority</option>
+    </select>
+    <label for="schoolInput">Mazhab untuk waktu Asar</label>
+    <select id="schoolInput">
+      <option value="0">Syafi'i, Maliki, Hanbali</option>
+      <option value="1">Hanafi</option>
+    </select>
+    <label class="checkbox-row" for="notificationsInput">
+      <input type="checkbox" id="notificationsInput">
+      Aktifkan notifikasi waktu sholat
+    </label>
+    <label for="reminderInput">Pengingat sebelum waktu sholat</label>
+    <select id="reminderInput">
+      <option value="0">Tanpa pengingat tambahan</option>
+      <option value="5">5 menit</option>
+      <option value="10">10 menit</option>
+      <option value="15">15 menit</option>
+    </select>
+    <div class="actions">
+      <button id="saveBtn" type="button">Simpan pengaturan</button>
+      <button id="refreshBtn" type="button">Perbarui jadwal</button>
+    </div>
+  </fieldset>
+  <p class="privacy">
+    Alamat lokasi dikirim melalui HTTPS ke
+    <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer">Aladhan</a>
+    untuk mengambil jadwal. Pengaturan disimpan di perangkat ini.
+  </p>
   <p id="status" role="status" aria-live="polite"></p>
 
+  <script src="prayer-utils.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
