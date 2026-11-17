@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Jadwal Sholat Akurat",
+  "name": "Jadwal Sholat & Pengingat",
   "version": "2.3.0",
   "description": "Jadwal, hitung mundur, dan notifikasi waktu sholat berdasarkan lokasi.",
   "icons": {
