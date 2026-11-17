@@ -12,7 +12,7 @@ Chrome extension Manifest V3 for displaying local prayer times, sunrise, Imsak, 
 2. Select **Load unpacked** and choose this project folder.
 3. Open the extension popup, select a location and calculation settings, then save.
 
-Prayer schedules are retrieved from the Aladhan API. The location text is sent to that service over HTTPS; the selected preferences and cached schedules are stored in the browser's extension storage.
+Prayer schedules are retrieved using the [Aladhan Prayer Times API](https://aladhan.com/prayer-times-api). The location text is sent to that service over HTTPS; the selected preferences and cached schedules are stored in the browser's extension storage.
 
 ## Settings
 
