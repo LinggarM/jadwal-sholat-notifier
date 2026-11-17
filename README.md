@@ -2,6 +2,10 @@
 
 Chrome extension Manifest V3 for displaying local prayer times, sunrise, Imsak, midnight, the final third of the night, a countdown, and optional prayer notifications.
 
+## Screenshot
+
+![Jadwal Sholat extension popup](screenshot.png)
+
 ## Install for development
 
 1. Open `chrome://extensions` in Chrome and enable **Developer mode**.
