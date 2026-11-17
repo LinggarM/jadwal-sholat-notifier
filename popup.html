@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jadwal Sholat</title>
+  <style>
+    body { width: 280px; padding: 16px; margin: 0; font-family: sans-serif; color: #222; }
+    .countdown { font-size: 28px; font-weight: bold; text-align: center; font-variant-numeric: tabular-nums; }
+    .battery-container { height: 16px; border: 2px solid #333; border-radius: 4px; padding: 2px; margin: 12px 0; position: relative; }
+    .battery-container::after { content: ''; position: absolute; right: -6px; top: 3px; width: 4px; height: 10px; background: #333; border-radius: 0 2px 2px 0; }
+    .battery-level { height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); width: 0%; transition: width 1s linear; border-radius: 2px; }
+    #nextPrayer { min-height: 18px; text-align: center; margin: 8px 0 16px; }
+    label { display: block; }
+    input { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
+    .hint { font-size: 11px; color: #666; margin-top: 5px; font-style: italic; }
+    button { width: 100%; margin-top: 10px; padding: 8px; cursor: pointer; }
+    #status { min-height: 16px; margin: 8px 0 0; font-size: 11px; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="countdown" id="countdown" aria-live="off">--:--:--</div>
+  <div class="battery-container">
+    <div class="battery-level" id="batteryBar"></div>
+  </div>
+  <p id="nextPrayer" aria-live="polite">Memuat jadwal...</p>
+
+  <label for="addressInput"><strong>Lokasi:</strong></label>
+  <input type="text" id="addressInput" placeholder="Pondok Gede, Bekasi, Indonesia" autocomplete="street-address">
+  <div class="hint">
+    Format dari lokasi terkecil ke terbesar.<br>
+    Contoh: "Kec. Pondok Gede, Jawa Barat" atau "Jl. Raya Jatiwaringin, Pondok Gede, Indonesia"
+  </div>
+  <button id="saveBtn" type="button">Simpan</button>
+  <p id="status" role="status" aria-live="polite"></p>
+
+  <script src="popup.js"></script>
+</body>
+</html>
